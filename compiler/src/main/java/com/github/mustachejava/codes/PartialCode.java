@@ -39,6 +39,12 @@ public class PartialCode extends DefaultCode {
       throw new MustacheException(e, tc);
     }
   }
+  
+  @Override
+	public void identity(Writer writer, boolean recursive) {
+	  if(recursive)
+		  identity(writer);
+	}
 
   @Override
   public Code[] getCodes() {

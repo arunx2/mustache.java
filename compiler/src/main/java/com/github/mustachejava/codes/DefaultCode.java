@@ -3,8 +3,10 @@ package com.github.mustachejava.codes;
 import com.github.mustachejava.Binding;
 import com.github.mustachejava.Code;
 import com.github.mustachejava.DefaultMustacheFactory;
+import com.github.mustachejava.Iteration;
 import com.github.mustachejava.Mustache;
 import com.github.mustachejava.MustacheException;
+import com.github.mustachejava.MustacheVisitor;
 import com.github.mustachejava.ObjectHandler;
 import com.github.mustachejava.TemplateContext;
 import com.github.mustachejava.util.Node;
@@ -15,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+
 
 /**
  * Simplest possible code implementaion with some default shared behavior
@@ -176,6 +179,43 @@ public class DefaultCode implements Code, Cloneable {
     } catch (IOException e) {
       throw new MustacheException("Failed to write", e, tc);
     }
+  }
+  
+  public void identity(Writer writer, boolean recursive) {
+	  if(!recursive) {
+		  identity(writer);
+	  } else {
+		  try {
+			  identify(getCodes(),writer);
+		  } catch (IOException e) {
+			  throw new MustacheException("Failed to write", e, tc);
+		  }
+	  }
+  }
+  
+  protected void identify(Code[] codes, Writer writer) throws IOException {
+	  for (int i = 0; i < codes.length; i++) {
+		  DefaultCode code = (DefaultCode) codes[i];
+		  if((code instanceof MustacheVisitor) ){
+			  continue;
+		  }
+
+		  if(code instanceof Iteration) {
+			  code.tag(writer, code.type);
+		  } else {
+			  code.identity(writer,false);
+		  }
+		  
+		  Code[] childCodes = code.getCodes();
+		  if(childCodes != null) {
+			  identify(childCodes,writer);
+		  }
+		 
+		  if(code instanceof Iteration) {					
+			  code.tag(writer, "/");
+			  code.appendText(writer);
+		  }
+	  }
   }
 
   protected void runIdentity(Writer writer) {
