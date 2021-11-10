@@ -1,15 +1,18 @@
 Mustache.java [![Build Status](https://travis-ci.org/spullara/mustache.java.svg?branch=master)](https://travis-ci.org/spullara/mustache.java)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fspullara%2Fmustache.java.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fspullara%2Fmustache.java?ref=badge_shield)
 =============
 
 As of release 0.9.0 mustache.java is now Java 8 only. For Java 6/7 support use 0.8.x.
 
-There are no external dependencies and the compiler library is 95k.
+There are no external dependencies and the compiler library is ~100k.
 
 **Mustache.java** is a derivative of [mustache.js](http://mustache.github.com/mustache.5.html).
 
 There is a Google Group for support and questions: <http://groups.google.com/group/mustachejava>
 
 Travis CI: https://travis-ci.org/spullara/mustache.java
+
+API documentation: http://spullara.github.io/mustache/apidocs/
 
 Largest production deployment of Mustache.java:
 - Twitter (the web site, email, syndicated widgets, etc)
@@ -32,7 +35,7 @@ Request for contributions:
 
 Documentation:
 
-- [Javadocs](http://mustachejava.s3-website-us-west-1.amazonaws.com/apidocs/index.html)
+- [Javadocs](http://spullara.github.io/mustache/apidocs/)
 - [Mustache.js manual](http://mustache.github.com/mustache.5.html)
 - Passes all of the `mustache` [specification tests](https://github.com/mustache/spec) modulo whitespace differences
 - Biggest difference between mustache.js and mustache.java is optional concurrent evaluation
@@ -78,7 +81,7 @@ Java 8+:
 <dependency>
   <groupId>com.github.spullara.mustache.java</groupId>
   <artifactId>compiler</artifactId>
-  <version>0.9.2</version>
+  <version>0.9.6</version>
 </dependency>
 ```
 
@@ -143,8 +146,8 @@ And would result in:
 	  Feature: Old.
 	  Feature: Ugly.
 
-Evaluation of the template proceeds serially. For instance, if you have blocking code within one of your callbacks
-you the system will pause while executing them:
+Evaluation of the template proceeds serially. For instance, if you have blocking code within one of your callbacks,
+the system will pause while executing them:
 
 ```java
 static class Feature {
@@ -242,3 +245,7 @@ An alternative approach for providing variables would be to use a Map object, li
     writer.flush();
   }
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fspullara%2Fmustache.java.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fspullara%2Fmustache.java?ref=badge_large)

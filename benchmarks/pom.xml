@@ -2,20 +2,18 @@
   <parent>
     <artifactId>mustache.java</artifactId>
     <groupId>com.github.spullara.mustache.java</groupId>
-    <version>0.9.5-SNAPSHOT</version>
+    <version>0.9.8-SNAPSHOT</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>benchmarks</artifactId>
   <packaging>jar</packaging>
 
-  <name>benchmarking</name>
+  <name>benchmarks</name>
   <url>http://maven.apache.org</url>
 
   <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <jmh.version>1.9.3</jmh.version>
-    <javac.target>1.8</javac.target>
+    <jmh.version>1.19</jmh.version>
     <uberjar.name>benchmarks</uberjar.name>
   </properties>
 
@@ -23,7 +21,7 @@
     <dependency>
       <groupId>com.github.spullara.mustache.java</groupId>
       <artifactId>compiler</artifactId>
-      <version>0.9.5-SNAPSHOT</version>
+      <version>0.9.8-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
@@ -37,36 +35,20 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-mapper-asl</artifactId>
-      <version>1.9.3</version>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.11</version>
-      <scope>test</scope>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
     </dependency>
     <dependency>
       <groupId>com.github.spullara.mustache.java</groupId>
       <artifactId>compiler</artifactId>
-      <version>0.9.5-SNAPSHOT</version>
+      <version>0.9.8-SNAPSHOT</version>
       <classifier>tests</classifier>
     </dependency>
   </dependencies>
 
   <build>
     <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.1</version>
-        <configuration>
-          <compilerVersion>${javac.target}</compilerVersion>
-          <source>${javac.target}</source>
-          <target>${javac.target}</target>
-        </configuration>
-      </plugin>
       <plugin>
         <artifactId>maven-dependency-plugin</artifactId>
         <version>2.10</version>
@@ -82,7 +64,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>1.2.1</version>
+        <version>1.6.0</version>
         <executions>
           <execution>
             <phase>test</phase>
@@ -146,20 +128,12 @@
     <pluginManagement>
       <plugins>
         <plugin>
-          <artifactId>maven-clean-plugin</artifactId>
-          <version>2.5</version>
-        </plugin>
-        <plugin>
           <artifactId>maven-deploy-plugin</artifactId>
           <version>2.8.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-install-plugin</artifactId>
           <version>2.5.1</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-jar-plugin</artifactId>
-          <version>2.4</version>
         </plugin>
         <plugin>
           <artifactId>maven-javadoc-plugin</artifactId>

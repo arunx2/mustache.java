@@ -16,10 +16,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MustacheParser {
   public static final String DEFAULT_SM = "{{";
   public static final String DEFAULT_EM = "}}";
+  private final boolean specConformWhitespace;
   private MustacheFactory mf;
 
-  protected MustacheParser(MustacheFactory mf) {
+  protected MustacheParser(MustacheFactory mf, boolean specConformWhitespace) {
     this.mf = mf;
+    this.specConformWhitespace = specConformWhitespace;
+  }
+
+  protected MustacheParser(MustacheFactory mf) {
+    this(mf, false);
   }
 
   public Mustache compile(String file) {
@@ -90,10 +96,28 @@ public class MustacheParser {
           if (c == sm.charAt(0)) {
             br.mark(1);
             if (sm.length() == 1 || br.read() == sm.charAt(1)) {
+              // If it is a delimiter change we need to specially handle it
               // Two mustaches, now capture command
               StringBuilder sb = new StringBuilder();
+              br.mark(1);
+              c = br.read();
+              boolean delimiter = c == '=';
+              if (delimiter) {
+                sb.append((char) c);
+              } else {
+                br.reset();
+              }
               while ((c = br.read()) != -1) {
                 br.mark(1);
+                if (delimiter) {
+                  if (c == '=') {
+                    // Reached the end of the definition
+                    delimiter = false;
+                  } else {
+                    sb.append((char) c);
+                  }
+                  continue;
+                }
                 if (c == em.charAt(0)) {
                   if (em.length() > 1) {
                     if (br.read() == em.charAt(1)) {
@@ -118,6 +142,7 @@ public class MustacheParser {
                 case '#':
                 case '^':
                 case '<':
+                case '?':
                 case '$': {
                   boolean oldStartOfLine = startOfLine;
                   startOfLine = startOfLine & onlywhitespace;
@@ -141,6 +166,9 @@ public class MustacheParser {
                     case '$':
                       mv.name(new TemplateContext(sm, em, file, line, startOfLine), variable, mustache);
                       break;
+                    case '?':
+                      mv.checkName(new TemplateContext(sm, em, file, line, startOfLine), variable, mustache);
+                      break;
                   }
                   iterable = lines != 0;
                   break;
@@ -159,9 +187,20 @@ public class MustacheParser {
                   return mv.mustache(new TemplateContext(sm, em, file, 0, startOfLine));
                 }
                 case '>': {
+                  String indent = (onlywhitespace && startOfLine) ? out.toString() : "";
                   out = write(mv, out, file, currentLine.intValue(), startOfLine);
                   startOfLine = startOfLine & onlywhitespace;
-                  mv.partial(new TemplateContext(sm, em, file, currentLine.get(), startOfLine), variable);
+                  mv.partial(new TemplateContext(sm, em, file, currentLine.get(), startOfLine), variable, indent);
+
+                  // a new line following a partial is dropped
+                  if (specConformWhitespace && startOfLine) {
+                    br.mark(2);
+                    int ca = br.read();
+                    if (ca == '\r') {
+                      ca = br.read();
+                    }
+                    if (ca != '\n') br.reset();
+                  }
                   break;
                 }
                 case '{': {
@@ -209,14 +248,14 @@ public class MustacheParser {
                 case '=':
                   // Change delimiters
                   out = write(mv, out, file, currentLine.intValue(), startOfLine);
-                  String delimiters = command.replaceAll("\\s+", "");
-                  int length = delimiters.length();
-                  if (length > 6 || length / 2 * 2 != length) {
+                  String trimmed = command.substring(1).trim();
+                  String[] split = trimmed.split("\\s+");
+                  if (split.length != 2) {
                     TemplateContext tc = new TemplateContext(sm, em, file, currentLine.get(), startOfLine);
-                    throw new MustacheException("Invalid delimiter string", tc);
+                    throw new MustacheException("Invalid delimiter string: " + trimmed, tc);
                   }
-                  sm = delimiters.substring(1, length / 2);
-                  em = delimiters.substring(length / 2, length - 1);
+                  sm = split[0];
+                  em = split[1];
                   break;
                 default: {
                   if (c == -1) {

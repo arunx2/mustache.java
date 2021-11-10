@@ -1,13 +1,5 @@
 package com.github.mustachejava.reflect;
 
-import static java.util.Collections.*;
-
-import java.lang.reflect.AccessibleObject;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 import com.github.mustachejava.Binding;
 import com.github.mustachejava.Code;
 import com.github.mustachejava.ObjectHandler;
@@ -21,6 +13,14 @@ import com.github.mustachejava.reflect.guards.WrappedGuard;
 import com.github.mustachejava.util.GuardException;
 import com.github.mustachejava.util.Wrapper;
 
+import java.lang.reflect.AccessibleObject;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import static java.util.Collections.singletonList;
+
 /**
  * Lookup objects using reflection and execute them the same way.
  *
@@ -29,6 +29,8 @@ import com.github.mustachejava.util.Wrapper;
  * Time: 3:02 PM
  */
 public class ReflectionObjectHandler extends BaseObjectHandler {
+  private static final Wrapper[] EMPTY_WRAPPERS = new Wrapper[0];
+  private static final Guard[] EMPTY_GUARDS = new Guard[0];
 
   protected static final Method MAP_METHOD;
 
@@ -80,15 +82,16 @@ public class ReflectionObjectHandler extends BaseObjectHandler {
         // This is used for lookups but otherwise always succeeds
         guards.add(createDotGuard(i, scope, lookup));
         List<Guard> wrapperGuard = new ArrayList<>(1);
-        wrapperGuard.add(createClassGuard(0, scope));
+        // We need to coerce this scope as it is checked post coercion
+        wrapperGuard.add(createClassGuard(0, coerce(scope)));
         wrapper = findWrapper(0, null, wrapperGuard, scope, lookup);
         if (wrappers == null) wrappers = new ArrayList<>();
         if (wrapper != null) {
           // We need to dig into a scope when dot notation shows up
           wrappers.add(wrapper);
           try {
-            // Pull out the next level
-            scope = coerce(wrapper.call(ObjectHandler.makeList(scope)));
+            // Pull out the next level from the coerced scope
+            scope = coerce(wrapper.call(ObjectHandler.makeList(coerce(scope))));
           } catch (GuardException e) {
             throw new AssertionError(e);
           }
@@ -105,9 +108,9 @@ public class ReflectionObjectHandler extends BaseObjectHandler {
         }
       }
       if (wrappers != null) {
-        guards.add(createWrappedGuard(i, wrappers, singletonList((Guard) createClassGuard(0, scope))));
+        guards.add(createWrappedGuard(i, wrappers, singletonList(new ClassGuard(0, scope))));
       }
-      Wrapper[] foundWrappers = wrappers == null ? null : wrappers.toArray(new Wrapper[wrappers.size()]);
+      Wrapper[] foundWrappers = wrappers == null ? null : wrappers.toArray(EMPTY_WRAPPERS);
       wrapper = findWrapper(i, foundWrappers, guards, scope, subname);
       if (wrapper == null) {
         // If we have found any wrappers we need to keep them rather than return a missing wrapper
@@ -157,7 +160,7 @@ public class ReflectionObjectHandler extends BaseObjectHandler {
   // Factories
 
   protected MissingWrapper createMissingWrapper(String name, List<Guard> guards) {
-    return new MissingWrapper(name, guards.toArray(new Guard[guards.size()]));
+    return new MissingWrapper(name, guards.toArray(EMPTY_GUARDS));
   }
 
   protected DotGuard createDotGuard(int i, Object scope, String lookup) {
@@ -186,7 +189,7 @@ public class ReflectionObjectHandler extends BaseObjectHandler {
 
   @SuppressWarnings("unchecked")
   protected Wrapper createWrapper(int scopeIndex, Wrapper[] wrappers, List<? extends Guard> guard, AccessibleObject member, Object[] arguments) {
-    return new ReflectionWrapper(scopeIndex, wrappers, guard.toArray(new Guard[guard.size()]), member, arguments, this);
+    return new ReflectionWrapper(scopeIndex, wrappers, guard.toArray(EMPTY_GUARDS), member, arguments, this);
   }
 
   @Override

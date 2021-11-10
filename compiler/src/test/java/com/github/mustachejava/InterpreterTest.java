@@ -15,8 +15,10 @@ import com.github.mustachejava.reflect.ReflectionObjectHandler;
 import com.github.mustachejava.reflect.SimpleObjectHandler;
 import com.github.mustachejava.resolver.DefaultResolver;
 import com.github.mustachejava.util.CapturingMustacheVisitor;
+import com.github.mustachejava.util.Wrapper;
 import com.github.mustachejavabenchmarks.JsonCapturer;
 import com.github.mustachejavabenchmarks.JsonInterpreterTest;
+import com.google.common.collect.ImmutableMap;
 import junit.framework.TestCase;
 import org.junit.Assert;
 import org.junit.Test;
@@ -248,6 +250,37 @@ public class InterpreterTest extends TestCase {
       };
     });
     assertEquals(getContents(root, "page.txt"), sw.toString());
+  }
+
+  public void testDefaultValue() throws IOException {
+    DefaultMustacheFactory mf = new DefaultMustacheFactory(root);
+    mf.setObjectHandler(new ReflectionObjectHandler() {
+      @Override
+      public Wrapper find(String name, List<Object> scopes) {
+        int i;
+        if ((i = name.indexOf("|")) != -1) {
+          String newName = name.substring(0, i);
+          String defaultValue = name.substring(i + 1);
+          Wrapper wrapper = super.find(newName, scopes);
+          if (wrapper instanceof MissingWrapper) {
+            return scopes1 -> {
+              // Test the guards returned in the missing wrapper
+              wrapper.call(scopes1);
+              return defaultValue;
+            };
+          }
+          return wrapper;
+        }
+        return super.find(name, scopes);
+      }
+    });
+    Mustache m = mf.compile(new StringReader("{{test}} {{test2|bar}} {{test3|baz}}"), "testDefaultValue");
+    StringWriter sw = new StringWriter();
+    m.execute(sw, new Object() {
+      String test = "foo";
+      String test2 = "BAR";
+    });
+    assertEquals("foo BAR baz", sw.toString());
   }
 
   public void testSimplePragma() throws MustacheException, IOException, ExecutionException, InterruptedException {
@@ -681,7 +714,7 @@ public class InterpreterTest extends TestCase {
       public MustacheVisitor createMustacheVisitor() {
         return new DefaultMustacheVisitor(this) {
           @Override
-          public void partial(TemplateContext tc, String variable) {
+          public void partial(TemplateContext tc, String variable, String indent) {
             if (variable.startsWith("+")) {
               // This is a dynamic partial rather than a static one
               TemplateContext partialTC = new TemplateContext("{{", "}}", tc.file(), tc.line(), tc.startOfLine());
@@ -710,7 +743,7 @@ public class InterpreterTest extends TestCase {
                 }
               });
             } else {
-              super.partial(tc, variable);
+              super.partial(tc, variable, indent);
             }
           }
         };
@@ -922,16 +955,53 @@ public class InterpreterTest extends TestCase {
     }
   }
 
-  public void testIterator() throws IOException {
-    MustacheFactory mf = createMustacheFactory();
-    Mustache m = mf.compile(new StringReader("{{#values}}{{.}}{{/values}}{{^values}}Test2{{/values}}"), "testIterator");
+  public void testVariableInhertiance() throws IOException {
+    DefaultMustacheFactory mf = createMustacheFactory();
+    Mustache m = mf.compile("issue_201/chat.html");
     StringWriter sw = new StringWriter();
-    m.execute(sw, new Object() {
-      Iterator values() {
-        return Arrays.asList(1, 2, 3).iterator();
-      }
-    }).close();
-    assertEquals("123", sw.toString());
+    m.execute(sw, new Object()).close();
+    assertEquals("<script src=\"test\"></script>", sw.toString());
+  }
+
+  public void testIterator() throws IOException {
+    {
+      MustacheFactory mf = createMustacheFactory();
+      Mustache m = mf.compile(new StringReader("{{#values}}{{.}}{{/values}}{{^values}}Test2{{/values}}"), "testIterator");
+      StringWriter sw = new StringWriter();
+      m.execute(sw, new Object() {
+        Iterator values() {
+          return Arrays.asList(1, 2, 3).iterator();
+        }
+      }).close();
+      assertEquals("123", sw.toString());
+    }
+    {
+      MustacheFactory mf = new DefaultMustacheFactory(root) {
+        @Override
+        public MustacheVisitor createMustacheVisitor() {
+          return new DefaultMustacheVisitor(this) {
+            @Override
+            public void iterable(TemplateContext templateContext, String variable, Mustache mustache) {
+              list.add(new IterableCode(templateContext, df, mustache, variable) {
+                @Override
+                protected boolean addScope(List<Object> scopes, Object scope) {
+                  scopes.add(scope);
+                  return true;
+                }
+              });
+            }
+          };
+        }
+      };
+      Mustache m = mf.compile(new StringReader("{{#values}}{{.}}{{/values}}{{^values}}Test2{{/values}}"), "testIterator");
+      StringWriter sw = new StringWriter();
+      m.execute(sw, new Object() {
+        Iterator values() {
+          return Arrays.asList(1, null, 3).iterator();
+        }
+      }).close();
+      assertEquals("13", sw.toString());
+    }
   }
 
   public void testObjectArray() throws IOException {
@@ -1182,7 +1252,7 @@ public class InterpreterTest extends TestCase {
       public MustacheVisitor createMustacheVisitor() {
         return new DefaultMustacheVisitor(this) {
           @Override
-          public void partial(TemplateContext tc, String variable) {
+          public void partial(TemplateContext tc, String variable, String indent) {
             TemplateContext partialTC = new TemplateContext("{{", "}}", tc.file(), tc.line(), tc.startOfLine());
             list.add(new PartialCode(partialTC, df, variable) {
               @Override
@@ -1254,6 +1324,31 @@ public class InterpreterTest extends TestCase {
     assertEquals("{{##", sw.toString());
   }
 
+  public void testImproperlyClosedVariable() throws IOException {
+    try {
+      new DefaultMustacheFactory().compile(new StringReader("{{{#containers}} {{/containers}}"), "example");
+      fail("Should have throw MustacheException");
+    } catch (MustacheException actual) {
+      assertEquals("Improperly closed variable in example:1 @[example:1]", actual.getMessage());
+    }
+  }
+
+  public void testLambdaExceptions() {
+    try {
+      String template = "hello {{#timesTwo}}a{{/timesTwo}}";
+      Mustache mustache = new DefaultMustacheFactory().compile(new StringReader(template), "test");
+      StringWriter sw = new StringWriter();
+      mustache.execute(sw, new Object() {
+        Function<String, String> timesTwo = (s) -> {
+          throw new RuntimeException();
+        };
+      });
+      fail("Should have throw MustacheException");
+    } catch (MustacheException me) {
+      // works
+    }
+  }
+
   public void testLimitedDepthRecursion() {
     try {
       StringWriter sw = execute("infiniteparent.html", new Context());
@@ -1263,6 +1358,14 @@ public class InterpreterTest extends TestCase {
     } catch (MustacheException e) {
       assertEquals("Maximum partial recursion limit reached: 100 @[infiniteparent.html:1]", e.getMessage());
     }
+  }
+
+  public void testIssue191() throws IOException {
+    MustacheFactory mustacheFactory = createMustacheFactory();
+    Mustache mustache = mustacheFactory.compile("templates/someTemplate.mustache");
+    StringWriter stringWriter = new StringWriter();
+    mustache.execute(stringWriter, ImmutableMap.of("title", "Some title!"));
+    assertEquals(getContents(root, "templates/someTemplate.txt"), stringWriter.toString());
   }
 
   public void testMalformedTag() {
@@ -1463,8 +1566,10 @@ public class InterpreterTest extends TestCase {
                   final Object object = get(scopes);
                   if (object == null) {
                     identity(writer);
+                    return writer;
+                  } else {
+                    return super.execute(writer, scopes);
                   }
-                  return super.execute(writer, scopes);
                 } catch (Exception e) {
                   throw new MustacheException("Failed to get value for " + name, e, tc);
                 }
@@ -1474,12 +1579,12 @@ public class InterpreterTest extends TestCase {
         };
       }
     };
-    Mustache test = dmf.compile(new StringReader("{{name}} - {{email}}"), "test");
+    Mustache test = dmf.compile(new StringReader("{{name}} - {{email}} 1"), "test");
     StringWriter sw = new StringWriter();
     Map<Object, Object> map = new HashMap<>();
     map.put("name", "Sam Pullara");
     test.execute(sw, map).close();
-    assertEquals("Sam Pullara - {{email}}", sw.toString());
+    assertEquals("Sam Pullara - {{email}} 1", sw.toString());
   }
 
   private DefaultMustacheFactory initParallel() {

@@ -14,6 +14,7 @@ import java.util.logging.Logger;
  * The default implementation that builds up Code lists
  */
 public class DefaultMustacheVisitor implements MustacheVisitor {
+  private static final Code[] EMPTY_CODES = new Code[0];
   protected static Logger logger = Logger.getLogger(DefaultMustacheVisitor.class.getSimpleName());
 
   private static final Code EOF = new DefaultCode() {
@@ -40,7 +41,7 @@ public class DefaultMustacheVisitor implements MustacheVisitor {
 
   @Override
   public Mustache mustache(TemplateContext templateContext) {
-    return new DefaultMustache(templateContext, df, list.toArray(new Code[list.size()]), templateContext.file());
+    return new DefaultMustache(templateContext, df, list.toArray(EMPTY_CODES), templateContext.file());
   }
 
   @Override
@@ -59,7 +60,12 @@ public class DefaultMustacheVisitor implements MustacheVisitor {
   }
 
   @Override
-  public void partial(TemplateContext tc, final String variable) {
+  public void checkName(TemplateContext templateContext, String variable, Mustache mustache) {
+      list.add(new ExtendCheckNameCode(templateContext, df, mustache, variable));
+  }
+
+  @Override
+  public void partial(TemplateContext tc, final String variable, String indent) {
     TemplateContext partialTC = new TemplateContext("{{", "}}", tc.file(), tc.line(), tc.startOfLine());
     list.add(new PartialCode(partialTC, df, variable));
   }

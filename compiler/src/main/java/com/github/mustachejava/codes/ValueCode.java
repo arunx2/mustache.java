@@ -26,8 +26,8 @@ import static com.github.mustachejava.util.NodeValue.value;
  * Output a value
  */
 public class ValueCode extends DefaultCode {
-  private final boolean encoded;
-  private final ExecutorService les;
+  protected final boolean encoded;
+  protected final ExecutorService les;
 
   @Override
   public void identity(Writer writer) {
@@ -77,8 +77,7 @@ public class ValueCode extends DefaultCode {
 
   protected Writer handleCallable(Writer writer, final Callable callable, final List<Object> scopes) throws Exception {
     if (les == null) {
-      Object call = callable.call();
-      execute(writer, call == null ? null : oh.stringify(call));
+      execute(writer, callable);
       return super.execute(writer, scopes);
     } else {
       // Flush the current writer
@@ -91,8 +90,7 @@ public class ValueCode extends DefaultCode {
       final Writer finalWriter = writer;
       les.execute(() -> {
         try {
-          Object call = callable.call();
-          execute(finalWriter, call == null ? null : oh.stringify(call));
+          execute(finalWriter, callable);
           latchedWriter.done();
         } catch (Throwable e) {
           latchedWriter.failed(e);
@@ -100,6 +98,11 @@ public class ValueCode extends DefaultCode {
       });
       return super.execute(latchedWriter, scopes);
     }
+  }
+
+  private void execute(Writer writer, Callable callable) throws Exception {
+    Object call = callable.call();
+    execute(writer, call == null ? null : oh.stringify(call));
   }
 
   @SuppressWarnings("unchecked")
@@ -111,6 +114,9 @@ public class ValueCode extends DefaultCode {
     } else {
       String templateText = newtemplate.toString();
       StringWriter sw = new StringWriter();
+      // The specification says that template functions need to be parsed with the default delimiters
+      // Running Interpolation - Alternate Delimiters - A lambda's return value should parse with the default delimiters.: failed!
+      // TemplateContext newTC = new TemplateContext(tc.startChars(), tc.endChars(), tc.file(), tc.line(), tc.startOfLine());
       TemplateContext newTC = new TemplateContext(DEFAULT_SM, DEFAULT_EM, tc.file(), tc.line(), tc.startOfLine());
       df.getFragment(new FragmentKey(newTC, templateText)).execute(sw, scopes).close();
       value = sw.toString();

@@ -35,7 +35,7 @@ public class DefaultMustacheFactory implements MustacheFactory {
   /**
    * This parser should work with any MustacheFactory
    */
-  protected final MustacheParser mc = new MustacheParser(this);
+  protected final MustacheParser mc = createParser();
 
   /**
    * New templates that are generated at runtime are cached here. The template key
@@ -61,10 +61,10 @@ public class DefaultMustacheFactory implements MustacheFactory {
   /**
    * Use the classpath to resolve mustache templates.
    *
-   * @param resourceRoot the location in the resources where templates are stored
+   * @param classpathResourceRoot the location in the resources where templates are stored
    */
-  public DefaultMustacheFactory(String resourceRoot) {
-    this.mustacheResolver = new DefaultResolver(resourceRoot);
+  public DefaultMustacheFactory(String classpathResourceRoot) {
+    this.mustacheResolver = new DefaultResolver(classpathResourceRoot);
   }
 
   /**
@@ -92,8 +92,11 @@ public class DefaultMustacheFactory implements MustacheFactory {
       filePath = dir + filePath;
     }
 
-    // Do not append extension if it is already defined
-    if (!name.endsWith(extension)) {
+    int sepIndex = name.lastIndexOf("/");
+    name = sepIndex == -1 ? name : name.substring(sepIndex);
+    
+    // Do not append extension if it has the same extension or original one
+    if (!(name.endsWith(extension) || name.contains("."))) {
       filePath = filePath + extension;
     }
 
@@ -221,12 +224,7 @@ public class DefaultMustacheFactory implements MustacheFactory {
     return recursionLimit;
   }
 
-  private final ThreadLocal<Map<String, Mustache>> partialCache = new ThreadLocal<Map<String, Mustache>>() {
-    @Override
-    protected Map<String, Mustache> initialValue() {
-      return new HashMap<>();
-    }
-  };
+  private final ThreadLocal<Map<String, Mustache>> partialCache = ThreadLocal.withInitial(() -> new HashMap<>());
 
   /**
    * In order to handle recursion, we need a temporary thread local cache during compilation
@@ -254,6 +252,10 @@ public class DefaultMustacheFactory implements MustacheFactory {
     } finally {
       cache.remove(s);
     }
+  }
+
+  protected MustacheParser createParser() {
+    return new MustacheParser(this);
   }
 
   protected Function<String, Mustache> getMustacheCacheFunction() {
